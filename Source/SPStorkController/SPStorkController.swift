@@ -71,6 +71,12 @@ public struct SPStorkController {
             presentationController.updatePresentingController()
         }
     }
+
+    static public func frameForView(_ view: UIView, traitCollection: UITraitCollection) -> CGRect {
+        let customWidth: CGFloat = traitCollection.horizontalSizeClass == .compact ? view.bounds.width : 360
+        let customX: CGFloat = traitCollection.horizontalSizeClass == .compact ? 0 : view.bounds.width - customWidth
+        return CGRect(x: customX, y: view.bounds.minY, width: customWidth, height: view.bounds.height)
+    }
     
     static private func controller(for view: UIView) -> UIViewController? {
         var nextResponder = view.next

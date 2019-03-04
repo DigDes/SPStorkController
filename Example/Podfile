@@ -1,0 +1,6 @@
+target 'stork-controller' do
+  use_frameworks!
+
+  pod 'SPStorkController', :path => '../'
+  pod 'SparrowKit'
+end

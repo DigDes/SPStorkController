@@ -49,6 +49,7 @@ class SPStorkPresentationController: UIPresentationController, UIGestureRecogniz
     private var startDismissing: Bool = false
     
     private var topSpace: CGFloat {
+        guard traitCollection.horizontalSizeClass == .compact else { return 0 }
         let statusBarHeight: CGFloat = UIApplication.shared.statusBarFrame.height
         return (statusBarHeight < 25) ? 30 : statusBarHeight
     }
@@ -57,7 +58,7 @@ class SPStorkPresentationController: UIPresentationController, UIGestureRecogniz
     private let cornerRadius: CGFloat = 10
     
     private var scaleForPresentingView: CGFloat {
-        guard let containerView = containerView else { return 0 }
+        guard let containerView = containerView, self.topSpace > 0 else { return 1 }
         let factor = 1 - (self.topSpace * 2 / containerView.frame.height)
         return factor
     }
@@ -71,8 +72,9 @@ class SPStorkPresentationController: UIPresentationController, UIGestureRecogniz
             print("SPStorkController - Custom height change to default value. Your height more maximum value")
         }
         let additionTranslate = containerView.bounds.height - customHeight
-        let yOffset: CGFloat = self.topSpace + 13 + additionTranslate
-        return CGRect(x: 0, y: yOffset, width: containerView.bounds.width, height: containerView.bounds.height - yOffset)
+        let yOffset: CGFloat = self.topSpace > 0 ? self.topSpace + 13 : 0 + additionTranslate
+        let updatedFrame = SPStorkController.frameForView(containerView, traitCollection: traitCollection)
+        return CGRect(x: updatedFrame.minX, y: yOffset, width: updatedFrame.width, height: updatedFrame.height - yOffset)
     }
     
     override func presentationTransitionWillBegin() {
@@ -148,7 +150,7 @@ class SPStorkPresentationController: UIPresentationController, UIGestureRecogniz
         
         presentedViewController.transitionCoordinator?.animate(
             alongsideTransition: { [weak self] context in
-                guard let `self` = self else { return }
+                guard let self = self else { return }
                 self.snapshotView?.transform = transformForSnapshotView
                 self.gradeView.alpha = self.alpha
             }, completion: { _ in
@@ -241,7 +243,7 @@ class SPStorkPresentationController: UIPresentationController, UIGestureRecogniz
         
         presentedViewController.transitionCoordinator?.animate(
             alongsideTransition: { [weak self] context in
-                guard let `self` = self else { return }
+                guard let self = self else { return }
                 self.snapshotView?.transform = .identity
                 self.snapshotViewContainer.transform = finalTransform
                 self.gradeView.alpha = 0
@@ -258,8 +260,8 @@ class SPStorkPresentationController: UIPresentationController, UIGestureRecogniz
         self.backgroundView.removeFromSuperview()
         self.snapshotView?.removeFromSuperview()
         self.snapshotViewContainer.removeFromSuperview()
-        
-        let offscreenFrame = CGRect(x: 0, y: containerView.bounds.height, width: containerView.bounds.width, height: containerView.bounds.height)
+        let updatedFrame = SPStorkController.frameForView(containerView, traitCollection: traitCollection)
+        let offscreenFrame = CGRect(x: updatedFrame.minX, y: updatedFrame.height, width: updatedFrame.width, height: updatedFrame.height)
         presentedViewController.view.frame = offscreenFrame
         presentedViewController.view.transform = .identity
     }
@@ -344,7 +346,7 @@ extension SPStorkPresentationController {
             
             self.presentedView?.transform = CGAffineTransform(translationX: 0, y: translationForModal)
             
-            let scaleFactor = 1 + (translationForModal / 5000)
+            let scaleFactor: CGFloat = self.scaleForPresentingView < 1 ? 1.0 + (translationForModal / 5000) : 1
             self.snapshotView?.transform = CGAffineTransform.init(scaleX: scaleFactor, y: scaleFactor)
             let gradeFactor = 1 + (translationForModal / 7000)
             self.gradeView.alpha = self.alpha - ((gradeFactor - 1) * 15)
@@ -362,10 +364,15 @@ extension SPStorkPresentationController {
         self.updateSnapshotAspectRatio()
         if presentedViewController.view.isDescendant(of: containerView) {
             UIView.animate(withDuration: 0.1) { [weak self] in
-                guard let `self` = self else { return }
+                guard let self = self else { return }
                 self.presentedViewController.view.frame = self.frameOfPresentedViewInContainerView
             }
         }
+    }
+
+    override func containerViewDidLayoutSubviews() {
+        super.containerViewDidLayoutSubviews()
+        self.updateLayoutIndicator()
     }
     
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
@@ -380,10 +387,12 @@ extension SPStorkPresentationController {
     
     private func updateLayoutIndicator() {
         guard let presentedView = self.presentedView else { return }
+        let indicatorStyle = self.indicatorView.style
         self.indicatorView.style = .line
         self.indicatorView.sizeToFit()
-        self.indicatorView.frame.origin.y = 12
+        self.indicatorView.frame.origin.y = 6
         self.indicatorView.center.x = presentedView.frame.width / 2
+        self.indicatorView.style = indicatorStyle
     }
     
     private func updateSnapshot() {
